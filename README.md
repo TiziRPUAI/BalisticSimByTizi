@@ -4,7 +4,7 @@ Simulador hecho en Unity donde se dispara un proyectil con un cañón para derri
 
 **Versión de Unity:** 6000.4.1f1
 
-**Video:** (link de YouTube)
+**Video:** (https://youtu.be/UxoFSUquHmA)
 
 ## Cómo jugar
 
