@@ -37,6 +37,19 @@ El puntaje es `100 puntos por pieza derribada × multiplicador de eficiencia`. E
 - `StructureTarget`: piezas de la torre y detección de derribo.
 - `SimulationManager`: estados, puntaje y reporte.
 
+## Historial en la nube
+
+Cada disparo se guarda en Unity Cloud Save con autenticación anónima, sin borrar los anteriores. El botón **VER HISTORIAL** muestra todos los disparos guardados: fecha, ángulo, fuerza, masa, resultado, distancia y piezas derribadas.
+
+Para que funcione hace falta conexión a internet y que el proyecto esté vinculado a Unity Cloud (Project Settings > Services) con Cloud Save activado.
+
+Scripts del historial:
+
+- `SimulationRecord`: datos de un disparo guardado.
+- `UGSServiceManager`: autenticación anónima y lectura/escritura en Cloud Save.
+- `CloudSaveBridge`: guarda cada disparo cuando termina.
+- `HistoryUIController` y `SimulationRecordItemUI`: pantalla del historial.
+
 ## Criterios de evaluación
 
 - Controles de ángulo, fuerza y masa.

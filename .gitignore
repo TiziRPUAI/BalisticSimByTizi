@@ -33,6 +33,7 @@
 *.mdb
 *.opendb
 *.VC.db
+*.vsconfig
 
 # Builds y paquetes
 *.apk
