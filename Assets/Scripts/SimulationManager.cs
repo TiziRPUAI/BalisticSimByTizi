@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Text;
 using TMPro;
@@ -16,9 +17,38 @@ public struct ShotParameters
     public float launchSpeed;
 }
 
+/// <summary>
+/// Resumen de un intento ya finalizado. Es un dato de solo lectura sin ninguna dependencia
+/// de persistencia: quien quiera guardarlo (Cloud Save, analíticas, un log local) lo arma
+/// a partir de esto, sin que SimulationManager sepa que existe.
+/// </summary>
+public readonly struct ShotReport
+{
+    public readonly ShotParameters shot;
+    public readonly bool hasImpact;
+    public readonly float horizontalDistance;
+    public readonly int knockedDown;
+    public readonly int totalPieces;
+
+    public ShotReport(ShotParameters shot, bool hasImpact, float horizontalDistance, int knockedDown, int totalPieces)
+    {
+        this.shot = shot;
+        this.hasImpact = hasImpact;
+        this.horizontalDistance = horizontalDistance;
+        this.knockedDown = knockedDown;
+        this.totalPieces = totalPieces;
+    }
+}
+
 public class SimulationManager : MonoBehaviour
 {
     public static SimulationManager Instance { get; private set; }
+
+    /// <summary>
+    /// Se dispara al terminar cada intento (estado Finished). SimulationManager no sabe quién
+    /// escucha esto ni qué hace con el dato: aquí no hay ninguna referencia a UGS ni a la red.
+    /// </summary>
+    public event Action<ShotReport> ShotFinished;
 
     [Header("Asentamiento")]
     [SerializeField, Min(0f)] private float minSettleTime = 1.5f;
@@ -139,6 +169,7 @@ public class SimulationManager : MonoBehaviour
     {
         SetState(SimulationState.Finished);
         CountKnocked(out int knocked, out int damagePoints);
+        int total = pieces.Length;
 
         // E = ½·m·v0²  (energía gastada en el disparo)
         float launchEnergy = 0.5f * shot.mass * shot.launchSpeed * shot.launchSpeed;
@@ -149,6 +180,9 @@ public class SimulationManager : MonoBehaviour
 
         reportText.text = BuildReport(knocked, damagePoints, launchEnergy, efficiency, score);
         reportPanel.SetActive(true);
+
+        float distance = hasImpact ? impact.horizontalDistance : 0f;
+        ShotFinished?.Invoke(new ShotReport(shot, hasImpact, distance, knocked, total));
     }
 
     private string BuildReport(int knocked, int damagePoints, float energy, float efficiency, int score)
