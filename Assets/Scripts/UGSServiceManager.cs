@@ -7,14 +7,15 @@ using Unity.Services.Core;
 using UnityEngine;
 
 /// <summary>
-/// Único punto de contacto con UGS. Nadie más en el proyecto referencia Unity.Services.*:
-/// eso es lo que mantiene la física y la UI desacopladas de la nube.
+/// Único punto de contacto con UGS. Cada disparo se guarda en su propia clave ("Shot_0001",
+/// "Shot_0002", ...) para que se vea individualmente en el Dashboard, más una clave "ShotCount"
+/// que lleva la cuenta. Con el límite de 2000 claves por jugador de Cloud Save, esto es seguro
+/// para cualquier cantidad razonable de disparos.
 /// </summary>
 public class UGSServiceManager : MonoBehaviour
 {
-    // Guardar TODO el historial bajo una sola clave evita superar el límite de claves de
-    // Cloud Save si se juegan muchos intentos.
-    private const string HistoryKey = "ShotHistory";
+    private const string CountKey = "ShotCount";
+    private const string ShotKeyPrefix = "Shot_";
 
     public static UGSServiceManager Instance { get; private set; }
 
@@ -56,8 +57,8 @@ public class UGSServiceManager : MonoBehaviour
     }
 
     /// <summary>
-    /// Descarga el historial actual, agrega el registro nuevo y sube la lista completa a la
-    /// misma clave, para no sobreescribir ni perder los disparos anteriores.
+    /// Guarda el disparo en su propia clave ("Shot_000N") y actualiza el contador, en un
+    /// único SaveAsync. No sobreescribe ni toca los disparos anteriores.
     /// </summary>
     public async Task AddToHistoryAsync(SimulationRecord record)
     {
@@ -65,50 +66,80 @@ public class UGSServiceManager : MonoBehaviour
 
         try
         {
-            SimulationHistoryData history = await LoadHistoryInternalAsync();
-            history.records.Add(record);
+            int nextIndex = await GetShotCountAsync() + 1;
+            string key = BuildShotKey(nextIndex);
 
-            var payload = new Dictionary<string, object> { { HistoryKey, JsonUtility.ToJson(history) } };
+            var payload = new Dictionary<string, object>
+            {
+                { key, JsonUtility.ToJson(record) },
+                { CountKey, nextIndex.ToString() }
+            };
             await CloudSaveService.Instance.Data.Player.SaveAsync(payload);
 
-            Debug.Log($"[UGS] Historial guardado. Total de disparos: {history.records.Count}");
+            Debug.Log($"[UGS] Disparo guardado en '{key}'. Total de disparos: {nextIndex}");
         }
         catch (Exception e)
         {
-            Debug.LogError($"[UGS] Error al guardar el historial: {e.Message}");
+            Debug.LogError($"[UGS] Error al guardar el disparo: {e.Message}");
         }
     }
 
+    /// <summary>
+    /// Lee el contador y baja todas las claves Shot_0001..Shot_000N en una sola llamada.
+    /// </summary>
     public async Task<List<SimulationRecord>> LoadHistoryAsync()
     {
         await EnsureReadyAsync();
 
-        SimulationHistoryData history = await LoadHistoryInternalAsync();
-        history.records.Sort((a, b) => string.CompareOrdinal(a.timestampUtc, b.timestampUtc));
-        return history.records;
-    }
+        List<SimulationRecord> records = new List<SimulationRecord>();
 
-    private async Task<SimulationHistoryData> LoadHistoryInternalAsync()
-    {
         try
         {
-            var keys = new HashSet<string> { HistoryKey };
-            var result = await CloudSaveService.Instance.Data.Player.LoadAsync(keys);
+            int count = await GetShotCountAsync();
+            if (count == 0) return records;
 
-            if (result.TryGetValue(HistoryKey, out var item))
+            var keys = new HashSet<string>();
+            for (int i = 1; i <= count; i++) keys.Add(BuildShotKey(i));
+
+            var result = await CloudSaveService.Instance.Data.Player.LoadAsync(keys);
+            foreach (var pair in result)
             {
-                string json = item.Value.GetAs<string>();
-                SimulationHistoryData parsed = JsonUtility.FromJson<SimulationHistoryData>(json);
-                if (parsed != null) return parsed;
+                SimulationRecord record = JsonUtility.FromJson<SimulationRecord>(pair.Value.Value.GetAs<string>());
+                if (record != null) records.Add(record);
             }
+
+            records.Sort((a, b) => string.CompareOrdinal(a.timestampUtc, b.timestampUtc));
         }
         catch (Exception e)
         {
             Debug.LogError($"[UGS] Error al leer el historial: {e.Message}");
         }
 
-        return new SimulationHistoryData();
+        return records;
     }
+
+    private async Task<int> GetShotCountAsync()
+    {
+        try
+        {
+            var keys = new HashSet<string> { CountKey };
+            var result = await CloudSaveService.Instance.Data.Player.LoadAsync(keys);
+
+            if (result.TryGetValue(CountKey, out var item) &&
+                int.TryParse(item.Value.GetAs<string>(), out int count))
+            {
+                return count;
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogError($"[UGS] Error al leer el contador de disparos: {e.Message}");
+        }
+
+        return 0;
+    }
+
+    private static string BuildShotKey(int index) => $"{ShotKeyPrefix}{index:0000}";
 
     private Task EnsureReadyAsync() => initializeTask ??= InitializeAsync();
 }

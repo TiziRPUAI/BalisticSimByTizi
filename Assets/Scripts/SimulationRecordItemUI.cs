@@ -18,7 +18,7 @@ public class SimulationRecordItemUI : MonoBehaviour
         if (DateTime.TryParse(record.timestampUtc, CultureInfo.InvariantCulture,
                 DateTimeStyles.RoundtripKind, out DateTime utc))
         {
-            dateText.text = utc.ToLocalTime().ToString("dd/MM HH:mm");
+            dateText.text = $"{utc.ToLocalTime():dd/MM HH:mm}  |  Azimut {record.azimuthDeg:+0;-0;0}°";
         }
         else
         {

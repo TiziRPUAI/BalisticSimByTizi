@@ -12,6 +12,7 @@ public enum SimulationState { Initializing, Ready, Flying, Settling, Finished }
 public struct ShotParameters
 {
     public float angleDeg;
+    public float azimuthDeg;
     public float force;
     public float mass;
     public float launchSpeed;
@@ -196,6 +197,7 @@ public class SimulationManager : MonoBehaviour
 
         sb.AppendLine("<b>Disparo</b>");
         sb.AppendLine($"Ángulo: {shot.angleDeg:F1}°  |  Impulso: {shot.force:F0} N·s  |  Masa: {shot.mass:F1} kg");
+        sb.AppendLine($"Azimut: {shot.azimuthDeg:+0;-0;0}°");
         sb.AppendLine($"Velocidad inicial: {shot.launchSpeed:F1} m/s  |  Energía: {energy:F0} J");
         sb.AppendLine();
 
@@ -265,3 +267,4 @@ public class SimulationManager : MonoBehaviour
 
     private void Restart() => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
 }
+
